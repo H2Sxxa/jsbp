@@ -1,8 +1,8 @@
-pub trait JavaBytes {
+pub trait JVMBytes {
     fn to_jbytes(&self) -> Vec<u8>;
 }
 
-impl JavaBytes for String {
+impl JVMBytes for String {
     fn to_jbytes(&self) -> Vec<u8> {
         let mut bytes = self.as_bytes().to_vec();
         transform(&mut bytes);
@@ -10,7 +10,7 @@ impl JavaBytes for String {
     }
 }
 
-impl JavaBytes for str {
+impl JVMBytes for str {
     fn to_jbytes(&self) -> Vec<u8> {
         let mut bytes = self.as_bytes().to_vec();
         transform(&mut bytes);

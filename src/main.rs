@@ -4,7 +4,7 @@ mod patcher;
 
 use {
     datatypes::Config,
-    patcher::{replace_slice, JavaBytes},
+    patcher::{replace_slice, JVMBytes},
 };
 
 use clap::Parser;
