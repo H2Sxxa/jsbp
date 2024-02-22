@@ -19,11 +19,13 @@ pub struct CliArgs {
     /// The path to the config of patch
     /// 修补的配置文件路径
     /// Example(config.yml)
+    /// ```yaml
     /// classes:
     ///   - path/to/the/target.class
     /// includes:
     ///   - from: Here is A string
     ///     to: target string
+    /// ```
     #[arg(short, long, verbatim_doc_comment)]
     pub config: String,
 
