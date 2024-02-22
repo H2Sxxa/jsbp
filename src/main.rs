@@ -36,45 +36,49 @@ fn main() {
     }
 
     let filename = String::from(absolute(&filepath).unwrap().to_string_lossy());
-    println!("{}", filename);
+    println!("Output to `{}`", filename);
 
     let mut archive = ZipArchive::new(Cursor::new(read(&filename).unwrap())).unwrap();
     let _ = remove_dir_all("cache");
     create_dir("cache").unwrap();
 
     config.classes.iter().for_each(|value| {
-        println!("Start patch {}", value);
-        let mut class = archive.by_name(&value).unwrap();
-        let mut class_byte = Vec::new();
-        class.read_to_end(&mut class_byte).unwrap();
-        //Patch
-        config.includes.iter().for_each(|info| {
-            if args.reverse {
-                class_byte = replace_slice(
-                    &class_byte,
-                    info.to.to_jbytes().as_slice(),
-                    info.from.to_jbytes().as_slice(),
-                );
-            } else {
-                class_byte = replace_slice(
-                    &class_byte,
-                    info.from.to_jbytes().as_slice(),
-                    info.to.to_jbytes().as_slice(),
-                );
-            }
-        });
-        //Save
-        let raw_path = format!("cache/{}", value);
-        let path = Path::new(&raw_path);
+        if let Ok(mut class) = archive.by_name(&value) {
+            println!("Start patch {}", value);
+            let mut class_byte = Vec::new();
 
-        create_dir_all(path.parent().unwrap()).unwrap();
+            class.read_to_end(&mut class_byte).unwrap();
+            //Patch
+            config.includes.iter().for_each(|info| {
+                if args.reverse {
+                    class_byte = replace_slice(
+                        &class_byte,
+                        info.to.to_jbytes().as_slice(),
+                        info.from.to_jbytes().as_slice(),
+                    );
+                } else {
+                    class_byte = replace_slice(
+                        &class_byte,
+                        info.from.to_jbytes().as_slice(),
+                        info.to.to_jbytes().as_slice(),
+                    );
+                }
+            });
+            //Save
+            let raw_path = format!("cache/{}", value);
+            let path = Path::new(&raw_path);
 
-        let mut temp = File::create(raw_path).unwrap();
-        temp.write(&class_byte).unwrap();
-        println!("Done");
+            create_dir_all(path.parent().unwrap()).unwrap();
+
+            let mut temp = File::create(raw_path).unwrap();
+            temp.write(&class_byte).unwrap();
+            println!("Done");
+        } else {
+            println!("Can't find `{}`, pass", value)
+        }
     });
 
-    println!("waiting to executing jartool...");
+    println!("Waiting to executing jartool...");
 
     let output = Command::new(args.jartool)
         .current_dir("cache")
