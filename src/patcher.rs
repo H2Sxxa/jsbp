@@ -1,3 +1,16 @@
+use std::{
+    borrow::BorrowMut,
+    fs::{create_dir_all, File},
+    io::{Cursor, Read, Write},
+    path::Path,
+    sync::Arc,
+};
+
+use tokio::sync::Mutex;
+use zip::ZipArchive;
+
+use crate::datatypes::ReplaceInfo;
+
 pub trait JVMBytes {
     fn to_jbytes(&self) -> Vec<u8>;
 }
@@ -51,4 +64,47 @@ where
     }
 
     result
+}
+
+pub async fn patch(
+    archive: Arc<Mutex<ZipArchive<Cursor<Vec<u8>>>>>,
+    value: String,
+    includes: Vec<ReplaceInfo>,
+    reverse: bool,
+) {
+    let mut guard = archive.lock().await;
+    if let Ok(mut class) = guard.borrow_mut().by_name(&value) {
+        println!("Start patch `{}`", value);
+        let mut class_byte = Vec::new();
+
+        class.read_to_end(&mut class_byte).unwrap();
+        //Patch
+
+        includes.iter().for_each(|info| {
+            if reverse {
+                class_byte = replace_slice(
+                    &class_byte,
+                    info.to.to_jbytes().as_slice(),
+                    info.from.to_jbytes().as_slice(),
+                );
+            } else {
+                class_byte = replace_slice(
+                    &class_byte,
+                    info.from.to_jbytes().as_slice(),
+                    info.to.to_jbytes().as_slice(),
+                );
+            }
+        });
+        //Save
+        let raw_path = format!("cache/{}", value);
+        let path = Path::new(&raw_path);
+
+        create_dir_all(path.parent().unwrap()).unwrap();
+
+        let mut temp = File::create(raw_path).unwrap();
+        temp.write(&class_byte).unwrap();
+        println!("Patch `{}` Done!", value);
+    } else {
+        println!("Can't find `{}`, pass", value)
+    };
 }

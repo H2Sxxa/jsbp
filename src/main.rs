@@ -1,26 +1,25 @@
-#![feature(absolute_path)]
 mod datatypes;
 mod patcher;
 
-use {
-    datatypes::Config,
-    patcher::{replace_slice, JVMBytes},
-};
+use datatypes::Config;
 
 use clap::Parser;
 use datatypes::CliArgs;
 use std::{
-    fs::{copy, create_dir, create_dir_all, read, remove_dir_all, File},
-    io::{stderr, stdout, Cursor, Read, Write},
+    fs::{copy, create_dir, read, remove_dir_all, File},
+    io::{stderr, stdout, Cursor, Write},
     path::{absolute, Path},
     process::Command,
+    sync::Arc,
 };
+use tokio::{sync::Mutex, task::JoinHandle};
 use zip::ZipArchive;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args = CliArgs::parse();
 
-    let config: Config = serde_yaml::from_reader(
+    let config: Config = serde_yml::from_reader(
         File::open(&args.config).expect(format!("Can't find {}", &args.config).as_str()),
     )
     .expect("Please use `jsbp -h` to see how to create a config file");
@@ -38,46 +37,40 @@ fn main() {
     let filename = String::from(absolute(&filepath).unwrap().to_string_lossy());
     println!("Output to `{}`", filename);
 
-    let mut archive = ZipArchive::new(Cursor::new(read(&filename).unwrap())).unwrap();
+    let archive: Arc<Mutex<ZipArchive<Cursor<Vec<u8>>>>> = Arc::new(Mutex::new(
+        ZipArchive::new(Cursor::new(read(&filename).unwrap())).unwrap(),
+    ));
     let _ = remove_dir_all("cache");
     create_dir("cache").unwrap();
 
-    config.classes.iter().for_each(|value| {
-        if let Ok(mut class) = archive.by_name(&value) {
-            println!("Start patch {}", value);
-            let mut class_byte = Vec::new();
-
-            class.read_to_end(&mut class_byte).unwrap();
-            //Patch
-            config.includes.iter().for_each(|info| {
-                if args.reverse {
-                    class_byte = replace_slice(
-                        &class_byte,
-                        info.to.to_jbytes().as_slice(),
-                        info.from.to_jbytes().as_slice(),
-                    );
-                } else {
-                    class_byte = replace_slice(
-                        &class_byte,
-                        info.from.to_jbytes().as_slice(),
-                        info.to.to_jbytes().as_slice(),
-                    );
-                }
-            });
-            //Save
-            let raw_path = format!("cache/{}", value);
-            let path = Path::new(&raw_path);
-
-            create_dir_all(path.parent().unwrap()).unwrap();
-
-            let mut temp = File::create(raw_path).unwrap();
-            temp.write(&class_byte).unwrap();
-            println!("Done");
-        } else {
-            println!("Can't find `{}`, pass", value)
+    if args.asynchronous {
+        println!("Enable asynchronous patch");
+        let handles: Vec<JoinHandle<()>> = config
+            .classes
+            .into_iter()
+            .map(|value| {
+                tokio::spawn(patcher::patch(
+                    archive.clone(),
+                    value,
+                    config.includes.clone(),
+                    args.reverse,
+                ))
+            })
+            .collect();
+        for handle in handles {
+            handle.await.unwrap();
         }
-    });
-
+    } else {
+        for value in config.classes {
+            patcher::patch(
+                archive.clone(),
+                value,
+                config.includes.clone(),
+                args.reverse,
+            )
+            .await;
+        }
+    }
     println!("Waiting to executing jartool...");
 
     let output = Command::new(args.jartool)
@@ -103,7 +96,6 @@ fn main() {
 }
 
 #[test]
-
 fn get_path() {
     print!(
         "{}",

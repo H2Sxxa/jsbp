@@ -1,13 +1,13 @@
 use clap::Parser;
 use serde::Deserialize;
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct Config {
     pub classes: Vec<String>,
     pub includes: Vec<ReplaceInfo>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct ReplaceInfo {
     pub from: String,
     pub to: String,
@@ -53,4 +53,9 @@ pub struct CliArgs {
     /// 覆盖目标文件
     #[arg(short, long, verbatim_doc_comment)]
     pub overlaid: bool,
+
+    /// Enable Async Patch
+    /// 启用异步修补
+    #[arg(short, long, verbatim_doc_comment)]
+    pub asynchronous: bool,
 }

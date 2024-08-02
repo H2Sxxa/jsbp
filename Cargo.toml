@@ -1,15 +1,22 @@
 [package]
 name = "jsbp"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-clap = { version = "4.5.1", features = ["derive"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_yaml = "0.9.32"
-zip = { version = "0.6.6", default-features = false, features = ["deflate"] }
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_yml = "0.0.11"
+zip = { version = "2.1.6", default-features = false, features = ["deflate"] }
+tokio = { version = "1", features = [
+    "rt-multi-thread",
+    "time",
+    "macros",
+    "sync",
+] }
+
 
 [profile.release]
 lto = true
