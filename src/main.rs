@@ -73,7 +73,7 @@ async fn main() {
             .await;
         }
     }
-    println!("Waiting to executing jartool...");
+    println!("Waiting to executing `{}`...", args.tool);
 
     let output = match args.tool.as_str() {
         "jar" => Command::new(args.jar)
