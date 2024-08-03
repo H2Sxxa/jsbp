@@ -29,7 +29,7 @@ async fn main() {
     if args.overlaid {
         filepath = Path::new(&args.target);
     } else {
-        patchname = format!("{}.patch", args.target);
+        patchname = args.output.replace("%origin%", &args.target);
         copy(&args.target, &patchname).unwrap();
         filepath = Path::new(&patchname);
     }
@@ -40,6 +40,8 @@ async fn main() {
     let archive: Arc<Mutex<ZipArchive<Cursor<Vec<u8>>>>> = Arc::new(Mutex::new(
         ZipArchive::new(Cursor::new(read(&filename).unwrap())).unwrap(),
     ));
+
+    println!("Clean cache dir...");
     let _ = remove_dir_all("cache");
     create_dir("cache").unwrap();
 
@@ -73,26 +75,42 @@ async fn main() {
     }
     println!("Waiting to executing jartool...");
 
-    let output = Command::new(args.jartool)
-        .current_dir("cache")
-        .args(["-uvf", filename.as_str(), "*"])
-        .output()
-        .expect("Failed in append");
+    let output = match args.tool.as_str() {
+        "jar" => Command::new(args.jar)
+            .args(["-uvf", filename.as_str(), "*"])
+            .current_dir("cache")
+            .output()
+            .expect("Failed in append"),
+        "7zip" => Command::new(args._7zip)
+            .args(["u", filename.as_str(), "*"])
+            .current_dir("cache")
+            .output()
+            .expect("Failed in append"),
+        _ => {
+            println!("Unknown tool! default to `jar`");
+            Command::new(args.jar)
+                .args(["-uvf", filename.as_str(), "*"])
+                .current_dir("cache")
+                .output()
+                .expect("Failed in append")
+        }
+    };
 
     let _ = stdout().write_all(&output.stdout);
     let _ = stderr().write_all(&output.stderr);
 
     if args.log {
-        File::create("jartool-stdout.log")
+        File::create("tool-stdout.log")
             .unwrap()
             .write_all(&output.stdout)
             .unwrap();
-        File::create("jartool-stderr.log")
+        File::create("tool-stderr.log")
             .unwrap()
-            .write_all(&output.stdout)
+            .write_all(&output.stderr)
             .unwrap();
     }
-    println!("Patch Successfully!");
+
+    println!("Patch Done!");
 }
 
 #[test]
